@@ -87,8 +87,19 @@ class Action extends Base implements ActionInterface
     private static function updateStatField(string $cid, string $fieldName, bool $isInc = true)
     {
         $db = Db::get();
+		$isMysql = strpos($db->getAdapterName(), "Mysql") !== false;
+        $isPostgre = strpos($db->getAdapterName(), "Pgsql") !== false;
+        $isSqlite = strpos($db->getAdapterName(), "SQLite") !== false;
+
         $tableName = $db->getPrefix() . 'contents';
-        $sql = "UPDATE $tableName SET $fieldName = $fieldName";
+		
+		$sql = "";
+		if ($isMysql || $isSqlite) {
+			$sql = "UPDATE $tableName SET $fieldName = $fieldName";
+		} else if ($isPostgre) {
+			$sql = "UPDATE \"$tableName\" SET \"$fieldName\" = \"$fieldName\"";
+		}
+        
         if ($isInc) {
             $sql .= ' + 1';
         } else {

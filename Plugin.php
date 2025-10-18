@@ -271,24 +271,29 @@ class Plugin implements PluginInterface
         }
 
         $db = Db::get();
-        $isSqlite = false;
-        if (strstr($db->getAdapterName(), "SQLite")) {
-            $isSqlite = true;
-        }
+		
+        $isMysql = strpos($db->getAdapterName(), "Mysql") !== false;
+        $isPostgre = strpos($db->getAdapterName(), "Pgsql") !== false;
+        $isSqlite = strpos($db->getAdapterName(), "SQLite") !== false;
+
         $tableName = $db->getPrefix() . 'contents';
         foreach ($fields as $key => $value) {
             $sql = "";
-            if ($isSqlite) {
+            if ($isMysql) {
+			    $sql = "SHOW COLUMNS FROM $tableName WHERE Field = '$key'";
+            } else if ($isPostgre) {
+                $sql = "SELECT column_name FROM information_schema.columns WHERE table_name = '$tableName' AND column_name = '$key'";
+			} else if ($isSqlite) {
                 $sql = "select * from sqlite_master where name='$tableName' and sql like '%$key%'";
-            } else {
-                $sql = "SHOW COLUMNS FROM $tableName WHERE Field = '$key'";
             }
             $result = $db->query($sql);
             if ($result->rowCount() == 0) {
-                if ($isSqlite) {
+                if ($isMysql) {
+					$db->query("ALTER TABLE $tableName ADD $key INT UNSIGNED NOT NULL COMMENT '$value' DEFAULT '0'");
+				} else if ($isPostgre) {
+					$db->query("ALTER TABLE $tableName ADD COLUMN \"$key\" INTEGER NOT NULL DEFAULT 0");
+                } else if($isSqlite){
                     $db->query("ALTER TABLE $tableName ADD $key INT UNSIGNED NOT NULL DEFAULT '0'");
-                } else {
-                    $db->query("ALTER TABLE $tableName ADD $key INT UNSIGNED NOT NULL COMMENT '$value' DEFAULT '0'");
                 }
             }
         }
